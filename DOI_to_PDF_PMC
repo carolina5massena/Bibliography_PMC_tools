@@ -10,6 +10,7 @@ import requests
 import pandas as pd
 import time
 
+csv_path = r"C:\Users\carol\OneDrive\Desktop\csv-scRNA-set.csv"
 prefs = {
     "download.default_directory": r"C:\Users\carol\OneDrive\Desktop", 
     "plugins.always_open_pdf_externally": True,  # Forces download instead of opening in-browser
@@ -25,12 +26,11 @@ options.add_experimental_option("prefs", prefs)
 driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
 wait = WebDriverWait(driver, 5)
 
-# Step 1: Load DOIs from CSV
-csv_path = r"C:\Users\carol\OneDrive\Desktop\csv-scRNA-set.csv"
+# Load DOIs from CSV
 df = pd.read_csv(csv_path)
 dois = df['DOI'].dropna().tolist()
 
-# Step 2: Loop through DOIs
+# Loop through DOIs
 for i, doi in enumerate(dois):
     print(f"\n🔁 Starting interaction {i + 1}/{len(dois)}")
 
