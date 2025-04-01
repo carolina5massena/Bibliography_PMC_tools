@@ -1,0 +1,90 @@
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import TimeoutException
+from webdriver_manager.chrome import ChromeDriverManager
+
+import requests
+import pandas as pd
+import time
+
+prefs = {
+    "download.default_directory": r"C:\Users\carol\OneDrive\Desktop", 
+    "plugins.always_open_pdf_externally": True,  # Forces download instead of opening in-browser
+    "download.prompt_for_download": False,
+    "pdfjs.disabled": True
+}
+
+# Set up Chrome
+options = webdriver.ChromeOptions()
+options.add_experimental_option("prefs", prefs)
+# options.add_argument("--start-fullscreen")  # Uncomment if you want fullscreen
+
+driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+wait = WebDriverWait(driver, 5)
+
+# Step 1: Load DOIs from CSV
+csv_path = r"C:\Users\carol\OneDrive\Desktop\csv-scRNA-set.csv"
+df = pd.read_csv(csv_path)
+dois = df['DOI'].dropna().tolist()
+
+# Step 2: Loop through DOIs
+for i, doi in enumerate(dois):
+    print(f"\n🔁 Starting interaction {i + 1}/{len(dois)}")
+
+    query = f'"{doi}"'  # Exact search
+    try:
+        pubmed_url = f"https://pubmed.ncbi.nlm.nih.gov/?term={query.replace(' ', '+')}"
+        print(f"🔍 PubMed Search: {pubmed_url}")
+        
+        driver.get(pubmed_url)
+        time.sleep(2)  # Give it time to load
+        original_tab = driver.current_window_handle
+
+        # Click PMC link if available
+        try:
+            pmc_link = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, 'a.link-item.pmc')))
+            pmc_link.click()
+            time.sleep(2)
+
+            # Find and switch to new PMC tab
+            all_tabs = driver.window_handles
+            pmc_tab = next((t for t in all_tabs if t != original_tab), None)
+
+            if pmc_tab:
+                driver.switch_to.window(pmc_tab)
+                print("✅ Switched to PMC full-text tab.")
+
+                # Close PubMed tab
+                driver.switch_to.window(original_tab)
+                driver.close()
+                print("🗙 Closed PubMed tab.")
+
+                # Switch back to PMC
+                driver.switch_to.window(pmc_tab)
+
+                try:
+                    link = driver.find_element(By.PARTIAL_LINK_TEXT, "PDF")
+                    link.click()
+                    time.sleep(2)
+
+
+                except TimeoutException:
+                    print("❌ PDF link not found.")
+            else:
+                print("❌ PMC tab not detected.")
+
+        except TimeoutException:
+            print("❌ PMC link not found.")
+            # Don't close if there's no new tab
+            if driver.current_window_handle != original_tab:
+                driver.close()
+                driver.switch_to.window(original_tab)
+
+    except Exception as e:
+        print(f"❌ Unexpected error: {e}")
+
+# Final step
+driver.quit()
